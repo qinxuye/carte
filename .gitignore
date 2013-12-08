@@ -11,3 +11,12 @@
 *.lai
 *.la
 *.a
+
+.metadata
+.project
+.pydevproject
+.settings
+
+# Cola
+*test.yaml
+*.pyc
