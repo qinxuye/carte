@@ -50,7 +50,7 @@ class WeiboParser(Parser):
     def __init__(self, opener=None, url=None, bundle=None, **kwargs):
         super(WeiboParser, self).__init__(opener=opener, url=url, **kwargs)
         self.bundle = bundle
-        self.uid = bundle.label
+        self.uid = bundle.uid
         self.opener.set_default_timeout(TIMEOUT)
         if not hasattr(self, 'logger') or self.logger is None:
             self.logger = get_logger(name='weibo_parser')
@@ -87,7 +87,17 @@ class WeiboParser(Parser):
             self.bundle.last_error_page_times = 0
             
         if self.bundle.last_error_page_times >= 15:
-            raise e
+            try:
+                import hashlib, os
+                
+                folder = 'errpages'
+                if not os.path.exists(folder):
+                    os.mkdir(folder)
+                pth = '%s/%s.html' % (folder, hashlib.md5(url).hexdigest())
+                with open(pth, 'w') as f:
+                    f.write(self.opener.open(url))
+            finally:
+                raise e
         return [url, ], []
 
 class MicroBlogParser(WeiboParser):
@@ -580,6 +590,8 @@ class UserFriendParser(WeiboParser):
                     data = json.loads(text)
                 except ValueError, e:
                     return self._error(url, e)
+                if 'domid' not in data:
+                    continue
                 domid = data['domid']
                 if domid.startswith('Pl_Official_LeftHisRelation__'):
                     html = beautiful_soup(data['html'])
@@ -600,6 +612,8 @@ class UserFriendParser(WeiboParser):
         try:
             ul = html.find(attrs={'class': 'cnfList', 'node-type': 'userListBox'})
         except AttributeError, e:
+            if br.geturl().startswith('http://e.weibo.com'):
+                return [], []
             return self._error(url, e)
         if ul is None:
             urls = []
@@ -675,7 +689,7 @@ class WeiqunParser(WeiboParser):
         weibo_user.qids = []
         lis = soup.find_all('li', attrs={'action-type': 'click_link'})
         for li in lis:
-            if 'action-data' in li:
+            if li.has_attr('action-data'):
                 li_data = li['action-data']
                 if '/' in li_data:
                     weibo_user.qids.append(li_data.rsplit('/', 1)[1])
