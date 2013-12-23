@@ -163,6 +163,8 @@ class MicroBlogParser(WeiboParser):
                 'class': 'WB_text', 
                 'node-type': 'feed_list_content'
             })
+
+            mblog.content = content_div.text
             
             # Links
             for content_a in content_div.find_all('a', 
@@ -575,12 +577,11 @@ class UserFriendParser(WeiboParser):
         if not self.check(url, br):
             return [], []
         
-        weibo_user = self.get_weibo_user()
-        
         html = None
         decodes = urldecode(url)
         is_follow = True
         is_new_mode = False
+        is_follow_lte_200 = False
         for script in soup.find_all('script'):
             text = script.text
             if text.startswith('FM.view'):
@@ -597,6 +598,10 @@ class UserFriendParser(WeiboParser):
                     html = beautiful_soup(data['html'])
                 if 'relate' in decodes and decodes['relate'] == 'fans':
                     is_follow = False
+                # Check if follow number is less than 200
+                if 'ns' in data and data['ns'] == 'pl.header.head.index':
+                    head_html = beautiful_soup(data['html'])
+                    is_follow_lte_200 = int(head_html.find('a', attrs={'class': 'S_func1'}).find('strong').text) <= 200
                 is_new_mode = True
             elif 'STK' in text:
                 text = text.replace('STK && STK.pageletM && STK.pageletM.view(', '')[:-1]
@@ -605,8 +610,14 @@ class UserFriendParser(WeiboParser):
                     data['pid'] == 'pl_relation_hisFans':
                     html = beautiful_soup(data['html'])
                 if data['pid'] == 'pl_relation_hisFans':
-                    is_follow = False    
-        
+                    is_follow = False
+
+        if is_follow_lte_200 is False:
+            self.bundle.exists = False
+            return [], []
+            
+        weibo_user = self.get_weibo_user()
+                    
         bundles = []
         ul = None
         try:
@@ -637,8 +648,14 @@ class UserFriendParser(WeiboParser):
             friend.uid = data['uid']
             friend.nickname = data['fnick']
             friend.sex = True if data['sex'] == u'm' else False
+
+            follow_lte_200 = False
+            connect_div = li.find('div', attrs={'class': 'connect'})
+            if connect_div is not None:
+                follow_size = int(connect_div.find('a').text)
+                follow_lte_200 = True if follow_size <= 200 else False
             
-            if self.bundle.level == 0:
+            if self.bundle.level == 0 and follow_lte_200 is True:
                 friend_uid = str('%s#1' % friend.uid)
                 bundles.append(WeiboUserBundle(friend_uid))
             if is_follow:

@@ -61,6 +61,7 @@ class MicroBlog(Document):
     mid = StringField(required=True)
     uid = StringField(required=True)
     omid = StringField()
+    content = StringField()
     created = DateTimeField()
     
     tags = ListField(StringField())

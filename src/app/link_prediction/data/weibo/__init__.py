@@ -58,4 +58,4 @@ def get_job():
     
 if __name__ == "__main__":
     from cola.worker.loader import load_job
-    load_job(os.path.dirname(os.path.abspath(__file__)))
+    load_job(os.path.dirname(os.path.abspath(__file__)), 'data')
